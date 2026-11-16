@@ -3,6 +3,7 @@ venv/
 .venv/
 env/
 virtualenv/
+source/
 
 # Кэш 
 __pycache__/
@@ -34,6 +35,7 @@ credentials.txt
 tmp/
 temp/
 allure-report/
+allure-results/
 
 # Файлы операционной системы 
 .DS_Store

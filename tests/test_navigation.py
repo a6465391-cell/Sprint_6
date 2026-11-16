@@ -2,9 +2,7 @@ import pytest
 import allure
 from selenium import webdriver
 from selenium.webdriver.firefox.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from page_objects.main_page import MainPage
 
 @allure.epic("Навигация")
 @allure.feature("Проверка ссылок")
@@ -14,22 +12,16 @@ class TestNavigation:
     def test_click_scooter_logo_goes_to_main(self):
         service = Service(executable_path="geckodriver.exe")
         driver = webdriver.Firefox(service=service)
-        wait = WebDriverWait(driver, 15)  # Увеличили таймаут до 15 сек
         
         try:
+            page = MainPage(driver)
             driver.get("https://qa-scooter.praktikum-services.ru/")
             
-            # 1. Находим логотип Самоката
-            logo_scooter = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".Header_LogoScooter__3lsAR")))
+            # Используем метод из MainPage
+            page.click_scooter_logo()
             
-            # 2. Кликаем
-            logo_scooter.click()
-            
-            # 3. ЖДЕМ, пока URL станет правильным (это надежнее, чем ждать title)
-            # Ждем, пока текущий URL будет равен главной странице
-            wait.until(lambda d: d.current_url == "https://qa-scooter.praktikum-services.ru/")
-            
-            # 4. Теперь безопасно проверяем заголовок
+            # Проверяем, что вернулись на главную (URL не изменился)
+            assert driver.current_url == "https://qa-scooter.praktikum-services.ru/"
             assert "Самокат" in driver.title or "Scooter" in driver.title
             
         finally:
@@ -39,30 +31,37 @@ class TestNavigation:
     def test_click_yandex_logo_opens_zen_in_new_tab(self):
         service = Service(executable_path="geckodriver.exe")
         driver = webdriver.Firefox(service=service)
-        wait = WebDriverWait(driver, 15)
         
         try:
+            page = MainPage(driver)
             driver.get("https://qa-scooter.praktikum-services.ru/")
             
-            # 1. Находим логотип Яндекса
-            logo_yandex = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".Header_LogoYandex__3TSOI")))
-            
-            # 2. Запоминаем текущую вкладку
+            # Запоминаем текущую вкладку
             main_window = driver.current_window_handle
             
-            # 3. Кликаем
-            logo_yandex.click()
+            # Используем метод из MainPage
+            page.click_yandex_logo()
             
-            # 4. Ждем появления новой вкладки
-            wait.until(lambda d: len(d.window_handles) > 1)
+            # Ждем появления новой вкладки
+            # Можно добавить простой цикл ожидания, если WebDriverWait не импортирован в тесте
+            import time
+            start_time = time.time()
+            while len(driver.window_handles) <= 1:
+                if time.time() - start_time > 15:
+                    raise TimeoutError("Новая вкладка не появилась за 15 секунд")
+                time.sleep(0.5)
             
-            # 5. Переключаемся на новую вкладку (последнюю в списке)
+            # Переключаемся на новую вкладку
             driver.switch_to.window(driver.window_handles[-1])
             
-            # 6. Ждем загрузки Дзена (проверяем URL)
-            wait.until(lambda d: "dzen.ru" in d.current_url)
+            # Ждем загрузки Дзена
+            import time
+            start_time = time.time()
+            while "dzen.ru" not in driver.current_url:
+                if time.time() - start_time > 15:
+                    raise TimeoutError("Дзен не загрузился за 15 секунд")
+                time.sleep(0.5)
             
-            # 7. Проверка заголовка
             assert "Дзен" in driver.title or "dzen" in driver.current_url
             
         finally:
