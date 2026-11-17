@@ -35,7 +35,7 @@ credentials.txt
 tmp/
 temp/
 allure-report/
-allure-results/
+
 
 # Файлы операционной системы 
 .DS_Store

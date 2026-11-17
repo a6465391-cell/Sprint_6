@@ -1,3 +1,4 @@
+import allure
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -6,19 +7,41 @@ from datetime import date
 from .base_page import BasePage
 
 class OrderPage(BasePage):
+    # --- ЛОКАТОРЫ (СЕЛЕКТОРЫ) ---
+    LOCATOR_COOKIE_BTN = (By.CSS_SELECTOR, ".App_CookieButton__3cvqF")
+    LOCATOR_METRO_INPUT = (By.CSS_SELECTOR, ".select-search__input")
+    LOCATOR_METRO_OPTION = (By.CSS_SELECTOR, ".select-search__option")
+    
+    LOCATOR_FIELD_NAME = (By.XPATH, '//input[@placeholder="* Имя"]')
+    LOCATOR_FIELD_LAST_NAME = (By.XPATH, '//input[@placeholder="* Фамилия"]')
+    LOCATOR_FIELD_ADDRESS = (By.XPATH, '//input[contains(@placeholder, "Адрес")]')
+    LOCATOR_FIELD_PHONE = (By.XPATH, '//input[contains(@placeholder, "Телефон")]')
+    
+    LOCATOR_NEXT_BTN = (By.XPATH, '//button[text()="Далее"]')
+    LOCATOR_DATE_FIELD = (By.XPATH, '//input[contains(@placeholder, "Когда привезти самокат")]')
+    
+    LOCATOR_DROPDOWN_CONTROL = (By.CSS_SELECTOR, ".Dropdown-control")
+    LOCATOR_DROPDOWN_OPTION = (By.CSS_SELECTOR, ".Dropdown-option")
+    
+    LOCATOR_ORDER_BTN = (By.CSS_SELECTOR, "button.Button_Middle__1CSJM:nth-child(2)")
+    LOCATOR_CONFIRM_BTN = (By.XPATH, '//button[text()="Да"]')
+    LOCATOR_SUCCESS_MODAL = (By.XPATH, '//div[contains(@class, "Order_ModalHeader") and contains(., "оформлен")]')
+
     def __init__(self, driver):
         super().__init__(driver)
 
+    @allure.step("Закрытие баннера с куки")
     def _close_cookies_banner(self):
         try:
-            btn = self.find_element((By.CSS_SELECTOR, ".App_CookieButton__3cvqF"))
-            self.driver.execute_script("arguments[0].click();", btn)
+            btn = self.find_element(self.LOCATOR_COOKIE_BTN)
+            self.click_by_js(btn)
         except NoSuchElementException:
             pass
 
+    @allure.step("Выбор станции метро: {metro}")
     def _select_metro(self, metro):
         for attempt in range(4):
-            metro_input = self.wait_for_clickable((By.CSS_SELECTOR, '.select-search__input'))
+            metro_input = self.wait_for_clickable(self.LOCATOR_METRO_INPUT)
             metro_input.click()
             metro_input.send_keys(Keys.CONTROL, 'a')
             metro_input.send_keys(Keys.DELETE)
@@ -26,18 +49,19 @@ class OrderPage(BasePage):
 
             option = None
             try:
-                option = self.wait_for_visibility((By.CSS_SELECTOR, '.select-search__option'))
+                option = self.wait_for_visibility(self.LOCATOR_METRO_OPTION)
             except TimeoutException:
                 metro_input.send_keys(Keys.ARROW_DOWN)
                 try:
-                    option = self.wait_for_visibility((By.CSS_SELECTOR, '.select-search__option'))
+                    option = self.wait_for_visibility(self.LOCATOR_METRO_OPTION)
                 except TimeoutException:
                     continue
 
-            option.click()
+            if option:
+                option.click()
 
             try:
-                value = self.find_element((By.CSS_SELECTOR, '.select-search__input')).get_attribute('value')
+                value = self.find_element(self.LOCATOR_METRO_INPUT).get_attribute('value')
             except NoSuchElementException:
                 return True
 
@@ -45,15 +69,17 @@ class OrderPage(BasePage):
                 return True
         return False
     
+    @allure.step("Заполнение формы заказа (шаг 1): имя={first_name}, фамилия={last_name}, адрес={address}, метро={metro}, телефон={phone}")
     def fill_order_form(self, first_name, last_name, address, metro, phone):
         self._close_cookies_banner()
 
         fields = [
-            ((By.XPATH, '//input[@placeholder="* Имя"]'), first_name),
-            ((By.XPATH, '//input[@placeholder="* Фамилия"]'), last_name),
-            ((By.XPATH, '//input[contains(@placeholder, "Адрес")]'), address),
-            ((By.XPATH, '//input[contains(@placeholder, "Телефон")]'), phone),
+            (self.LOCATOR_FIELD_NAME, first_name),
+            (self.LOCATOR_FIELD_LAST_NAME, last_name),
+            (self.LOCATOR_FIELD_ADDRESS, address),
+            (self.LOCATOR_FIELD_PHONE, phone),
         ]
+        
         for locator, value in fields:
             el = self.wait_for_clickable(locator)
             el.clear()
@@ -63,16 +89,17 @@ class OrderPage(BasePage):
             raise AssertionError(f"Не удалось выбрать станцию метро: {metro}")
 
         try:
-            self.find_element((By.CSS_SELECTOR, '.select-search__input'))
+            self.find_element(self.LOCATOR_METRO_INPUT)
         except NoSuchElementException:
-            self.wait_for_presence((By.XPATH, '//input[contains(@placeholder, "Когда привезти самокат")]'))
+            self.wait_for_presence(self.LOCATOR_DATE_FIELD)
             return
 
-        self.click((By.XPATH, '//button[text()="Далее"]'))
-        self.wait_for_presence((By.XPATH, '//input[contains(@placeholder, "Когда привезти самокат")]'))
+        self.click(self.LOCATOR_NEXT_BTN)
+        self.wait_for_presence(self.LOCATOR_DATE_FIELD)
 
+    @allure.step("Заполнение формы доставки (шаг 2): выбор даты и срока аренды")
     def fill_delivery_form(self):
-        date_field = self.wait_for_clickable((By.XPATH, '//input[contains(@placeholder, "Когда привезти самокат")]'))
+        date_field = self.wait_for_clickable(self.LOCATOR_DATE_FIELD)
         date_field.click()
 
         today = date.today()
@@ -82,12 +109,14 @@ class OrderPage(BasePage):
             ' and not(contains(@class, "--disabled"))'
             f' and normalize-space(text())="{today.day}"]'
         )
+        # Для динамического XPath используем кортеж (By.XPATH, строка)
         self.click((By.XPATH, day_xpath))
 
-        self.click((By.CSS_SELECTOR, '.Dropdown-control'))
-        self.click((By.CSS_SELECTOR, '.Dropdown-option'))
+        self.click(self.LOCATOR_DROPDOWN_CONTROL)
+        self.click(self.LOCATOR_DROPDOWN_OPTION)
 
     def _modal_state(self, driver):
+        # Вспомогательный метод, НЕ ставим @allure.step
         if driver.find_elements(By.XPATH, '//button[text()="Да"]'):
             return "confirm"
         if driver.find_elements(
@@ -96,28 +125,27 @@ class OrderPage(BasePage):
             return "success"
         return False
 
+    @allure.step("Отправка заказа с подтверждением")
     def submit_order(self):
         try:
-            self.find_element((By.CSS_SELECTOR, '.Dropdown-option'))
+            self.find_element(self.LOCATOR_DROPDOWN_OPTION)
             self.find_element((By.TAG_NAME, 'body')).click()
         except NoSuchElementException:
             pass
 
-        btn = self.wait_for_clickable((By.CSS_SELECTOR, 'button.Button_Middle__1CSJM:nth-child(2)'))
-        self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+        btn = self.wait_for_clickable(self.LOCATOR_ORDER_BTN)
+        self.scroll_to_element(btn)
         btn.click()
 
-        # Ожидаем изменения состояния модального окна
         WebDriverWait(self.driver, 10).until(self._modal_state)
         state = self._modal_state(self.driver)
         
         if state == "confirm":
-            self.click((By.XPATH, '//button[text()="Да"]'))
+            self.click(self.LOCATOR_CONFIRM_BTN)
 
-        # Ожидаем появления сообщения об успехе
-        self.wait_for_visibility((By.XPATH, '//div[contains(@class, "Order_ModalHeader") and contains(., "оформлен")]'))
-        print("Заказ успешно оформлен!")
+        self.wait_for_visibility(self.LOCATOR_SUCCESS_MODAL)
 
+    @allure.step("Проверка сообщения об успехе")
     def check_success_message(self):
-        element = self.wait_for_visibility((By.XPATH, '//div[contains(@class, "Order_ModalHeader") and contains(., "оформлен")]'))
+        element = self.wait_for_visibility(self.LOCATOR_SUCCESS_MODAL)
         return element.text
