@@ -1,7 +1,8 @@
 import pytest
 import allure
-from selenium.webdriver.support.ui import WebDriverWait
 from page_objects.main_page import MainPage
+
+BASE_URL = "https://qa-scooter.praktikum-services.ru/"
 
 @allure.epic("Навигация")
 @allure.feature("Проверка ссылок")
@@ -9,35 +10,22 @@ class TestNavigation:
 
     @allure.story("Переход на главную Самоката по клику на логотип")
     def test_click_scooter_logo_goes_to_main(self, driver):
-        # driver уже создан и maximizing выполнен в фикстуре
-        wait = WebDriverWait(driver, 10)
         page = MainPage(driver)
-        
-        driver.get("https://qa-scooter.praktikum-services.ru/")
+        driver.get(BASE_URL)
         
         page.click_scooter_logo()
         
-        wait.until(lambda d: "scooter" in d.current_url or "Самокат" in d.title)
-        
-        assert "Самокат" in driver.title or "Scooter" in driver.title.lower()
+        assert driver.current_url == BASE_URL, f"Ожидался URL {BASE_URL}, но получен {driver.current_url}"
 
-    @allure.story("Переход на Дзен по клику на логотип Яндекса (в новом окне)")
+    @allure.story("Переход на Дзен по клику на логотип Яндекса")
     def test_click_yandex_logo_opens_zen_in_new_tab(self, driver):
-        wait = WebDriverWait(driver, 15)
         page = MainPage(driver)
-        
-        driver.get("https://qa-scooter.praktikum-services.ru/")
-        
-        main_window = driver.current_window_handle
+        driver.get(BASE_URL)
         
         page.click_yandex_logo()
         
-        wait.until(lambda d: len(d.window_handles) > 1)
+        page.switch_to_new_tab()
         
-        driver.switch_to.window(driver.window_handles[-1])
+        current_url = page.get_current_url()
         
-        wait.until(lambda d: "dzen.ru" in d.current_url)
-        
-        assert "dzen.ru" in driver.current_url
-        
-        driver.switch_to.window(main_window)
+        assert "dzen.ru" in current_url, f"Ожидался переход на dzen.ru, но получен {current_url}"

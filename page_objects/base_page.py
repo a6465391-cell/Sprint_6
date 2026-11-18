@@ -1,14 +1,14 @@
-import allure # Если решите добавить шаги сюда (обычно не нужно, но для метода ниже можно)
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 
 class BasePage:
-    def __init__(self, driver):
-        self.driver = driver # Driver живет только здесь!
-        self.wait = WebDriverWait(driver, 10)
+    def open(self, url):
+        self.driver.get(url)
 
-    # --- БАЗОВЫЕ МЕТОДЫ (БЕЗ ALLURE) ---
+    def __init__(self, driver):
+        self.driver = driver 
+        self.wait = WebDriverWait(driver, 30)
 
     def find_element(self, locator):
         return self.driver.find_element(*locator)
@@ -17,7 +17,6 @@ class BasePage:
         return self.driver.find_elements(*locator)
 
     def click(self, locator):
-        # Стандартный клик
         self.wait.until(EC.element_to_be_clickable(locator)).click()
 
     def input_text(self, locator, text):

@@ -2,12 +2,12 @@ import allure
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
 from datetime import date
 from .base_page import BasePage
 
 class OrderPage(BasePage):
-    # --- ЛОКАТОРЫ (СЕЛЕКТОРЫ) ---
+    LOCATOR_ORDER_BTN = (By.XPATH, '(//button[contains(normalize-space(), "Заказать")])[last()]')
+    
     LOCATOR_COOKIE_BTN = (By.CSS_SELECTOR, ".App_CookieButton__3cvqF")
     LOCATOR_METRO_INPUT = (By.CSS_SELECTOR, ".select-search__input")
     LOCATOR_METRO_OPTION = (By.CSS_SELECTOR, ".select-search__option")
@@ -17,14 +17,13 @@ class OrderPage(BasePage):
     LOCATOR_FIELD_ADDRESS = (By.XPATH, '//input[contains(@placeholder, "Адрес")]')
     LOCATOR_FIELD_PHONE = (By.XPATH, '//input[contains(@placeholder, "Телефон")]')
     
-    LOCATOR_NEXT_BTN = (By.XPATH, '//button[text()="Далее"]')
+    LOCATOR_NEXT_BTN = (By.XPATH, '//button[contains(text(), "Далее")]')
     LOCATOR_DATE_FIELD = (By.XPATH, '//input[contains(@placeholder, "Когда привезти самокат")]')
     
     LOCATOR_DROPDOWN_CONTROL = (By.CSS_SELECTOR, ".Dropdown-control")
     LOCATOR_DROPDOWN_OPTION = (By.CSS_SELECTOR, ".Dropdown-option")
     
-    LOCATOR_ORDER_BTN = (By.CSS_SELECTOR, "button.Button_Middle__1CSJM:nth-child(2)")
-    LOCATOR_CONFIRM_BTN = (By.XPATH, '//button[text()="Да"]')
+    LOCATOR_CONFIRM_BTN = (By.XPATH, '//button[contains(text(), "Да")]')
     LOCATOR_SUCCESS_MODAL = (By.XPATH, '//div[contains(@class, "Order_ModalHeader") and contains(., "оформлен")]')
 
     def __init__(self, driver):
@@ -34,6 +33,7 @@ class OrderPage(BasePage):
     def _close_cookies_banner(self):
         try:
             btn = self.find_element(self.LOCATOR_COOKIE_BTN)
+
             self.click_by_js(btn)
         except NoSuchElementException:
             pass
@@ -58,7 +58,8 @@ class OrderPage(BasePage):
                     continue
 
             if option:
-                option.click()
+                # Клик через JS надежнее для выпадающих списков
+                self.click_by_js(option)
 
             try:
                 value = self.find_element(self.LOCATOR_METRO_INPUT).get_attribute('value')
@@ -77,8 +78,7 @@ class OrderPage(BasePage):
             (self.LOCATOR_FIELD_NAME, first_name),
             (self.LOCATOR_FIELD_LAST_NAME, last_name),
             (self.LOCATOR_FIELD_ADDRESS, address),
-            (self.LOCATOR_FIELD_PHONE, phone),
-        ]
+            (self.LOCATOR_FIELD_PHONE, phone), ]
         
         for locator, value in fields:
             el = self.wait_for_clickable(locator)
@@ -107,43 +107,26 @@ class OrderPage(BasePage):
             '//div[contains(@class, "react-datepicker__day")'
             ' and not(contains(@class, "--outside-month"))'
             ' and not(contains(@class, "--disabled"))'
-            f' and normalize-space(text())="{today.day}"]'
-        )
-        # Для динамического XPath используем кортеж (By.XPATH, строка)
+            f' and normalize-space(text())="{today.day}"]')
         self.click((By.XPATH, day_xpath))
 
         self.click(self.LOCATOR_DROPDOWN_CONTROL)
         self.click(self.LOCATOR_DROPDOWN_OPTION)
 
-    def _modal_state(self, driver):
-        # Вспомогательный метод, НЕ ставим @allure.step
-        if driver.find_elements(By.XPATH, '//button[text()="Да"]'):
-            return "confirm"
-        if driver.find_elements(
-            By.XPATH, '//div[contains(@class, "Order_ModalHeader") and contains(., "оформлен")]'
-        ):
-            return "success"
-        return False
-
     @allure.step("Отправка заказа с подтверждением")
     def submit_order(self):
-        try:
-            self.find_element(self.LOCATOR_DROPDOWN_OPTION)
-            self.find_element((By.TAG_NAME, 'body')).click()
-        except NoSuchElementException:
-            pass
 
         btn = self.wait_for_clickable(self.LOCATOR_ORDER_BTN)
         self.scroll_to_element(btn)
-        btn.click()
+        self.click_by_js(btn)  
 
-        WebDriverWait(self.driver, 10).until(self._modal_state)
-        state = self._modal_state(self.driver)
-        
-        if state == "confirm":
-            self.click(self.LOCATOR_CONFIRM_BTN)
+        try:
+            confirm_btn = self.wait_for_clickable(self.LOCATOR_CONFIRM_BTN)
+            confirm_btn.click()
+        except TimeoutException:
+            pass
 
-        self.wait_for_visibility(self.LOCATOR_SUCCESS_MODAL)
+        self.wait_for_visibility(self.LOCATOR_SUCCESS_MODAL) 
 
     @allure.step("Проверка сообщения об успехе")
     def check_success_message(self):
